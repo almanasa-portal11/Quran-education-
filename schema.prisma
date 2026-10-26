@@ -1,0 +1,115 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum Role { ADMIN TEACHER PARENT STUDENT }
+enum RequestStatus { PENDING APPROVED REJECTED }
+enum AttendanceStatus { PRESENT ABSENT EXCUSED LATE }
+enum ProgressType { HIFZ MURAJAA TASMEE }
+enum InvoiceStatus { PENDING PAID OVERDUE CANCELLED }
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      Role
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  student   Student? @relation("StudentUser")
+  children  Student[] @relation("ParentChildren")
+  halaqat   Halaqa[]
+  progress  Progress[]
+  notifications Notification[]
+}
+
+model Student {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  user      User    @relation("StudentUser", fields: [userId], references: [id])
+  parentId  String?
+  parent    User?   @relation("ParentChildren", fields: [parentId], references: [id])
+  halaqaId  String?
+  halaqa    Halaqa? @relation(fields: [halaqaId], references: [id])
+  birthDate DateTime?
+  level     String?
+  attendance Attendance[]
+  progress  Progress[]
+  invoices  Invoice[]
+}
+
+model Halaqa {
+  id        String  @id @default(cuid())
+  name      String
+  teacherId String
+  teacher   User    @relation(fields: [teacherId], references: [id])
+  zoomLink  String?
+  schedule  String?
+  students  Student[]
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  halaqaId  String
+  halaqa    Halaqa   @relation(fields: [halaqaId], references: [id])
+  date      DateTime
+  attendance Attendance[]
+}
+
+model Attendance {
+  id        String @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id])
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+  status    AttendanceStatus
+  @@unique([sessionId, studentId])
+}
+
+model Progress {
+  id        String @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+  teacherId String
+  teacher   User    @relation(fields: [teacherId], references: [id])
+  type      ProgressType
+  surah     Int
+  fromAyah  Int
+  toAyah    Int
+  rating    Int      // 1..5
+  note      String?
+  date      DateTime @default(now())
+}
+
+model Invoice {
+  id        String @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+  month     String   // YYYY-MM
+  amount    Decimal  @db.Decimal(10, 2)
+  status    InvoiceStatus @default(PENDING)
+  paidAt    DateTime?
+  @@unique([studentId, month])
+}
+
+model AdmissionRequest {
+  id          String @id @default(cuid())
+  studentName String
+  parentName  String
+  email       String
+  phone       String
+  notes       String?
+  status      RequestStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  title     String
+  body      String
+  read      Boolean @default(false)
+  createdAt DateTime @default(now())
+}
